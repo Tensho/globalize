@@ -1,8 +1,22 @@
+puts "Globalize::ActiveRecord::ActMacro Patched"
+
 module Globalize
   module ActiveRecord
     module ActMacro
+      def load_schema! # :nodoc:
+        super
+        init_translation
+      end
+
       def translates(*attr_names)
-        options = attr_names.extract_options!
+        @globalize_options = attr_names.extract_options!
+        @globalize_attr_names = *attr_names
+      end
+
+      def init_translation
+        options = @globalize_options
+        attr_names = @globalize_attr_names
+
         # Bypass setup_translates! if the initial bootstrapping is done already.
         setup_translates!(options) unless translates?
         check_columns!(attr_names)
@@ -45,7 +59,7 @@ module Globalize
             self.ignored_columns += translated_attribute_names.map(&:to_s)
             reset_column_information
           end
-        rescue ::ActiveRecord::NoDatabaseError, PG::ConnectionBad
+        rescue ::ActiveRecord::NoDatabaseError
           warn 'Unable to connect to a database. Globalize skipped ignoring columns of translated attributes.'
         end
       end
@@ -61,7 +75,7 @@ module Globalize
              "Attribute name(s): #{overlap.join(', ')}\n"].join
           )
         end
-      rescue ::ActiveRecord::NoDatabaseError, PG::ConnectionBad
+      rescue ::ActiveRecord::NoDatabaseError
         warn 'Unable to connect to a database. Globalize skipped checking attributes with conflicting column names.'
       end
 
@@ -101,6 +115,8 @@ module Globalize
                                 :extend      => HasManyExtensions,
                                 :autosave    => false,
                                 :inverse_of  => :globalized_model
+
+        accepts_nested_attributes_for :translations
 
         after_create :save_translations!
         after_update :save_translations!
